@@ -3,44 +3,66 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\LoginRequest;
-use App\Providers\RouteServiceProvider;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
+use Illuminate\Validation\ValidationException;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Muestra el formulario de inicio de sesión.
+     *
+     * @return \Illuminate\View\View
      */
-    public function create(): View
+    public function create()
     {
         return view('auth.login');
     }
 
     /**
-     * Handle an incoming authentication request.
+     * Procesa el inicio de sesión.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
      */
-    public function store(LoginRequest $request): RedirectResponse
-    {
-        $request->authenticate();
+    public function store(Request $request)
+{
+    // Validación del formulario de inicio de sesión
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        $request->session()->regenerate();
+    // Intento de autenticación
+    if (Auth::attempt($request->only('email', 'password'))) {
+        $user = Auth::user();
 
-        return redirect()->intended(RouteServiceProvider::HOME);
+        // Verifica si el usuario está activo directamente
+        if (!$user->is_active) {
+            Auth::logout();
+            return redirect()->route('activation.wait')->with('status', 'Por favor activa tu cuenta antes de iniciar sesión.');
+        }
+
+        return redirect()->intended('dashboard');
     }
 
+    // Si la autenticación falla, lanza una excepción
+    throw ValidationException::withMessages([
+        'email' => __('Las credenciales proporcionadas no coinciden con nuestros registros.'),
+    ]);
+}
+
     /**
-     * Destroy an authenticated session.
+     * Cierra la sesión del usuario autenticado.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request)
     {
-        Auth::guard('web')->logout();
+        Auth::logout();
 
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
 
         return redirect('/');

@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\ActivateAccount;
-use App\Notifications\UserActivated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
 
 class ActivationController extends Controller
 {
@@ -22,20 +22,12 @@ class ActivationController extends Controller
     {
         $user = User::findOrFail($id);
 
-        // Verifica si la cuenta ya está activada
         if ($user->is_active) {
             return redirect()->route('login')->with('status', 'Your account is already activated.');
         }
 
-        // Activa la cuenta del usuario
         $user->is_active = true;
         $user->save();
-
-        // Notificar al administrador que el usuario ha activado su cuenta
-        $admin = User::where('role', 'Administrador')->first();
-        if ($admin) {
-            $admin->notify(new UserActivated($user));
-        }
 
         return redirect()->route('login')->with('status', 'Your account has been activated! You can now log in.');
     }
@@ -50,14 +42,22 @@ class ActivationController extends Controller
     {
         $user = Auth::user();
 
-        // Verifica si la cuenta ya está activada
+        if (!$user) {
+            return redirect()->route('login')->with('status', 'Please log in to resend the activation link.');
+        }
+
         if ($user->is_active) {
             return redirect()->route('dashboard')->with('status', 'Your account is already activated.');
         }
 
-        // Reenviar el enlace de activación
-        $user->notify(new ActivateAccount());
+        $activationUrl = URL::temporarySignedRoute(
+            'activation.verify',
+            now()->addMinutes(5),
+            ['id' => $user->id]
+        );
 
-        return back()->with('status', 'Activation link resent to your email.');
+        $user->notify(new ActivateAccount($activationUrl));
+
+        return redirect()->route('activation.wait')->with('status', 'A new verification link has been sent to your email address.');
     }
 }

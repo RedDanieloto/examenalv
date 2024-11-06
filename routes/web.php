@@ -1,56 +1,34 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Auth\ActivationController;
 use Illuminate\Support\Facades\Route;
-use App\Models\User;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\ActivationController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
-Route::get('/resend-activation', [ActivationController::class, 'resend'])->name('activation.resend');
+// Registro de usuario
+Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+Route::post('/register', [RegisteredUserController::class, 'store']);
 
-// Rutas de autenticación generadas por Breeze
-Route::get('/', function () {
-    return view('welcome');
-});
+// Ruta para esperar activación
+Route::get('/activation/wait', function () {
+    return view('auth.activation-wait');
+})->name('activation.wait')->middleware('auth');
 
-// Ruta de activación de cuenta
-Route::get('/activate-account/{id}', function ($id) {
-    $user = User::findOrFail($id);
+// Ruta para reenviar el correo de activación
+Route::post('/activation/resend', [ActivationController::class, 'resend'])
+    ->name('activation.resend')
+    ->middleware('auth');
 
-    // Verifica si el usuario ya está activado
-    if ($user->is_active) {
-        return redirect('/login')->with('status', 'Account is already activated.');
-    }
+// Ruta para activar la cuenta
+Route::get('/activation/verify/{id}', [ActivationController::class, 'activate'])
+    ->name('activation.verify');
 
-    // Activa la cuenta
-    $user->is_active = true;
-    $user->save();
+// Rutas de autenticación
+Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
-    return redirect('/login')->with('status', 'Account activated! You can now log in.');
-})->name('activation.verify')->middleware('signed');
-
-// Rutas de perfil (ejemplo de protección de ruta para usuarios autenticados)
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
-
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-// Rutas protegidas por roles
-Route::middleware(['auth', 'role:Administrador'])->group(function () {
-    Route::get('/admin', function () {
-        return view('admin.dashboard');
-    })->name('admin.dashboard');
-});
-
-Route::middleware(['auth', 'role:User'])->group(function () {
-    Route::get('/user', function () {
-        return view('user.dashboard');
-    })->name('user.dashboard');
-});
-
-// Rutas de autenticación generadas por Laravel Breeze
-require __DIR__.'/auth.php';
+// Ruta de dashboard (protegida por autenticación y verificación)
+Route::middleware(['auth', 'verified'])->get('/dashboard', function () {
+    return view('dashboard');
+})->name('dashboard');

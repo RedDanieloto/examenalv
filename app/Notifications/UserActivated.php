@@ -25,6 +25,7 @@ class UserActivated extends Notification
         return (new MailMessage)
             ->subject('New Account Activation')
             ->line("The user {$this->user->name} has activated their account.")
-            ->line("Email: {$this->user->email}");
+            ->line("Email: {$this->user->email}")
+            ->line('Thank you for your attention.');
     }
 }

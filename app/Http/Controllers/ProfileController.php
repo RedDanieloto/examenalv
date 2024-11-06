@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Storage;
+use function back;
+use function view;
 
 class ProfileController extends Controller
 {
@@ -56,5 +59,29 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return Redirect::to('/');
+    }
+    public function updateProfilePhoto(Request $request)
+    {
+        $request->validate([
+            'profile_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $user = $request->user();
+
+        if ($request->hasFile('profile_photo')) {
+            // Elimina la imagen anterior si existe
+            if ($user->profile_photo_path) {
+                Storage::disk('spaces')->delete($user->profile_photo_path);
+            }
+
+            // Guarda la nueva imagen en DigitalOcean Spaces
+            $path = $request->file('profile_photo')->store('profile-photos', 'spaces');
+
+            // Actualiza la ruta en la base de datos
+            $user->profile_photo_path = $path;
+            $user->save();
+        }
+
+        return back()->with('status', 'Profile photo updated successfully.');
     }
 }
